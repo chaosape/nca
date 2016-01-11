@@ -1,0 +1,461 @@
+%% Author: Dan DaCosta
+Specification "nca".
+
+%% This is an experiment toward using nominal constants as a device to 
+%% allocate a fresh (wrt the current memory) contiguous sequence of 
+%% memory in the specification of an imperative programming language 
+%% permitting pointer arithmetic. In this experiment, the goal is to 
+%% formally prove that given a list of unique natural numbers, an 
+%% extension may be found that preserves uniqueness.
+
+%% We could have alternatively chosen to explicitly define how contiguous 
+%% sequences of fresh memory addresses were selected in the speficication. 
+%% Instead we use nominal constants to represent a "fresh" starting 
+%% address for a contiguous chunk and at the reasoning level, we 
+%% will show that a suitable address always exists and then instantiate 
+%% the nominal constant with this address.
+ 
+%% I see this approach as having two benefits: 1) if we are thinking
+%% of using such a technique to represent memory allocation ala
+%% "malloc" we should not require the specification to describe
+%% exactly how such allocation works 2) At the specification level, 
+%% memory allocations will be logical, that is, pointer arithmetic
+%% will never allow operations based on an allocated to address to
+%% enter the domain of a different contiguous blocking starting at a
+%% different allocated address.
+
+%% Basic Idea: 1) Prove a theorem that states if I extend a unique
+%% list by a contiguous non-intersecting list then the result is
+%% still unique 2) Prove a theorem showing that such an extension 
+%% always exists 3) instantiate the nominal constant with the 
+%% result of 2). 
+
+Define nat : nat -> prop by
+  nat z;
+  nat (s X) := nat X.
+
+Define mem : nat -> natlist -> prop by
+  mem X (hd X M);
+  mem X (hd Y M) := mem X M.
+
+Define uniq : natlist -> prop by
+  uniq mt;
+  uniq (hd X Xs) := nat X /\ (mem X Xs -> false) /\ uniq Xs.
+
+Theorem lt_id: forall Y, nat Y -> {lt Y (s Y)}.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+ 
+    apply IH to H2.
+    search.
+
+Theorem lt_trans: forall X Y Z, {lt X Y} -> {lt Y Z} -> {lt X Z}.
+  induction on 1.
+  intros.
+  case H1.
+
+    case H2.
+    search.
+
+    case H2.
+    apply IH to H3 H4.
+    search.
+
+Theorem lt_nat1: forall X Y, {lt X Y} -> nat X.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem lt_abs1: forall X, {lt X X} -> false.
+  induction on 1.
+  intros.
+  case H1.
+
+    apply IH to H2.
+
+Theorem lt_abs2: forall X Y, {lt X Y} -> {lt Y X} -> false.
+  induction on 1.
+  intros.
+  case H1.
+
+    case H2.
+
+    case H2.
+    apply IH to H3 H4.
+
+Theorem lt_inv1: forall X Y, {lt X Y} -> {lt X (s Y)}.
+  induction on 1.
+  intros.
+  case H1.
+  
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem lt_inv2: forall X Y, {lt (s X) Y} -> {lt X Y}.
+  intros.
+  case H1.
+  apply lt_inv1 to H2.
+  search.
+
+Theorem add_id2: forall X Y, {add X z Y} -> X = Y.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem add_nat1: forall X Y Z, {add X Y Z} -> nat X.
+  induction on 1.
+  intros.
+  case H1.
+  
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem add_total: forall X Y, nat X -> exists Z, {add X Y Z}.
+  induction on 1.
+  intros.
+  case H1.
+
+    exists Y.
+    search.
+
+    apply IH to H2 with Y = Y.
+    exists (s Z).
+    search.
+
+Theorem add_inv1: forall X Y, {add X (s z) Y} -> Y = s X.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem add_inv2: forall X Y Z, {add X (s Y) Z} -> {lt X Z}.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+
+    apply IH to H2.
+    search.
+
+Theorem add_inv3: forall A B C, {add A (s B) C} -> exists C', C = s C' /\ {add A B C'}.
+  induction on 1.
+  intros.
+  case H1.
+
+    exists B.
+    search.
+
+    apply IH to H2.
+    exists (s C').
+    search.
+
+Theorem add_inv4: forall A A' B B' C, {lt A' B'} -> {add C A' A} -> {add C B' B} -> {lt A B}.
+  induction on 1.
+  intros.
+  case H1.
+
+    apply add_id2 to H2.
+    apply add_inv2 to H3.
+    search.
+
+    apply add_inv3 to H2.
+    apply add_inv3 to H3.
+    apply IH to H4 H5 H6.
+    search.
+
+Theorem add_inv5: forall A B C1 C2, {add A B C1} -> {add A B C2} -> C1 = C2.
+  induction on 1.
+  intros.
+  case H1.
+
+    case H2.
+    search.
+
+    case H2.
+    apply IH to H3 H4.
+    search.
+
+Theorem sublist_nonint:
+        forall O A Z M ,
+        (forall Y, {lt Y O} -> Y = A \/ {lt A Y} -> mem Y M -> false)
+        -> {lt Z O}
+        -> {lt A Z}
+        -> (forall Y, {lt Y Z} -> Y = A \/ {lt A Y} -> mem Y M -> false).
+  intros.
+  apply lt_trans to H4 H2.
+  apply H1 to H7 H5 H6.
+
+Theorem trichotomy_degenerate: forall Y, nat Y -> {lt z Y} \/ z = Y \/ {lt Y z}.
+  induction on 1.
+  intros.
+  case H1.
+  
+    search.
+    
+    apply IH to H2.
+    case H3.
+    
+      search.
+
+      search.
+
+      search.
+
+Theorem trichotomy: forall X Y, nat X -> nat Y -> {lt X Y} \/ X = Y \/ {lt Y X}.
+  induction on 1.
+  intros.
+  case H1.
+
+    apply trichotomy_degenerate to H2.
+    search.
+
+
+    case H2.
+
+      search.
+
+      apply IH to H3 H4.
+      case H5.
+
+        search.
+
+        search.
+
+        search.
+
+Theorem alloc_aux_nat2: forall A C M M', {alloc_aux A C M M'} -> nat C.
+  induction on 1.
+  intros.
+  case H1.
+
+    search.
+
+    apply IH to H3.
+    search.
+
+%% If some number is not in a given list and we allocate
+%% an extension that does not contain that number the 
+%% resulting list does not contain that number.
+Theorem alloc_aux_preserves_nonmem: forall A S M M' Z T, 
+         {alloc_aux A S M M'} 
+         -> {add A S T}
+         -> {lt Z A} \/ {lt T Z} 
+         -> (mem Z M -> false) 
+         -> (mem Z M' -> false).
+  induction on 1.
+  intros.
+  case H1.
+  
+    apply add_id2 to H2.
+    case H5.
+        
+        case H3.
+
+          apply lt_abs1 to H6.
+
+          apply lt_abs1 to H6.
+
+        apply H4 to H6.
+
+
+    apply add_inv5 to H2 H6.    
+    apply add_inv2 to H6.
+    apply add_inv3 to H6.
+    case H3.
+
+      case H5.
+
+        apply lt_abs2 to H8 H10.
+        
+        assert ({lt Z A} \/ {lt C' Z}).
+        apply IH to H7 H9 H12 H4 H11.
+
+      case H5.
+
+        apply lt_abs1 to H10.
+
+        apply lt_inv2 to H10.
+        assert ({lt Z A} \/ {lt C' Z}).
+        apply IH to H7 H9 H13 H4 H11.
+         
+%% If we are given an extension such that no number in the 
+%% extension occurs in the given list and that given list 
+%% is unique then the resulting list is unique.
+Theorem alloc_aux_preserves_uniq: forall M X M' A O, 
+        uniq M 
+        -> {add A (s X) O} 
+        -> (forall Y, {lt Y O} -> Y = A \/ {lt A Y} -> mem Y M -> false)
+        -> {alloc_aux A X M M'} 
+        -> uniq M'.
+  induction on 4.
+  intros.
+  case H4.
+
+    apply add_inv1 to H2.
+    apply add_nat1 to H2.
+    apply lt_id to H5.
+    assert (A = A \/ {lt A A}).
+    %% Partial workaround ala Wang.
+    assert (mem A M -> false).
+    
+      intros.
+      apply H3 to H6 H7 H8.
+    
+    search.
+
+    apply alloc_aux_nat2 to H6.
+    apply lt_id to _ with Y = s S.
+    apply add_inv4 to H8 H5 H2.
+    apply add_inv2 to H5.
+    assert (Z = A \/ {lt A Z}).
+    %% Partial workaround ala Wang.
+    assert (mem Z M -> false).
+
+      intros.
+      apply H3 to H9 H11 H12.
+
+    apply sublist_nonint to H3 H9 H10.
+    apply IH to H1 H5 H13 H6.
+    %% Partial workaround ala Wang.
+    assert (mem Z M'1 -> false).
+
+      intros.
+      apply add_inv3 to H5.
+      apply lt_nat1 to H9.
+      case H17.
+      apply lt_id to H18.
+      assert ({lt (s C') A} \/ {lt C' (s C')}).
+      apply alloc_aux_preserves_nonmem to H6 H16 H20 H12 H15.
+    
+   apply lt_nat1 to H9.
+   search.
+
+%% There exists a number greater than every number in a list.
+Theorem list_max_succ: forall M, uniq M -> exists Z, nat Z /\ forall Y, mem Y M -> {lt Y Z}.
+  induction on 1.  
+  intros.
+  case H1.
+
+    exists z.
+    split.
+    
+      search.
+
+      intros.
+      case H2.
+
+    apply IH to H4.
+    apply trichotomy to H2 H5.
+    case H7.
+
+      exists Z.
+      split.
+
+        search.
+
+        intros.
+        case H9.
+
+          search.
+
+          apply H6 to H10.
+          search.
+
+      exists (s Z).
+      split.
+
+        search.
+
+        intros.
+        case H8.
+        
+          backchain lt_id.
+
+          apply H6 to H9.
+          apply lt_inv1 to H10.
+          search.
+
+      exists (s X).
+      split.
+
+        search.
+
+        intros.
+        case H9.
+
+          backchain lt_id.
+
+          apply H6 to H10.
+          apply lt_trans to H11 H8.
+          apply lt_inv1 to H12.
+          search.
+        
+%% For any list, there exists a contiguous sequence of numbers of arbitrary size
+%% that does not intersect with that list.
+Theorem uniq_ext_list_exists: 
+        forall M X, 
+        uniq M 
+        -> exists A, nat A /\ forall L,  
+           {add A (s X) L} -> (forall Y, {lt Y L} -> Y = A \/ {lt A Y} -> mem Y M -> false).
+  intros.
+  apply list_max_succ to H1.
+  case H1.
+
+    exists z.
+    split.
+
+      search.
+
+      intros.
+      case H7.
+
+    exists Z.
+    split.
+
+      search.
+
+      intros.
+      apply H3 to H10.
+      case H9.
+
+        apply lt_abs1 to H11.
+
+        apply lt_abs2 to H11 H12.    
+
+%% Allocation preserves uniquness
+Theorem alloc_preserves_uniq: forall M X M', 
+        uniq M 
+        -> {alloc X M M'} 
+        -> uniq M'.
+  intros.
+  case H2.
+  apply uniq_ext_list_exists to H1 with X = X.
+  apply add_total to H4 with Y = s X.
+  apply H5 to H6.
+  inst H3 with n1 = A.
+  apply alloc_aux_preserves_uniq to H1 H6 H7 H8.
+  search. 
+  
+  
